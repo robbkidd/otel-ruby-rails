@@ -1,0 +1,16 @@
+version: "2.4"
+
+services:
+  web:
+    image: railsgreeter
+    build: .
+    environment:
+      RAILS_ENV: development
+      SECRET_KEY_BASE: abunchofjibberishbecausethisisnotontheinternet
+      LOG_LEVEL: debug
+    tmpfs:
+      - /myapp/tmp/pids
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: "curl -f http://localhost:3000/health"
