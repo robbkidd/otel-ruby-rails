@@ -1,0 +1,36 @@
+# Inspired by https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/examples/demo
+receivers:
+  otlp:
+    protocols:
+      http:
+
+exporters:
+  logging:
+
+  zipkin:
+    endpoint: "http://zipkin-all-in-one:9411/api/v2/spans"
+    format: proto
+
+  jaeger:
+    endpoint: jaeger-all-in-one:14250
+    insecure: true
+
+  otlp/honeycomb:
+    endpoint: api.honeycomb.io:443
+    headers:
+      "x-honeycomb-team": "${HONEYCOMB_API_KEY}"
+      "x-honeycomb-dataset": "${HONEYCOMB_DATASET}"
+
+processors:
+  batch:
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [logging, zipkin, jaeger, otlp/honeycomb]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [logging, otlp/honeycomb]

@@ -4,6 +4,20 @@
 
 require "action_controller/railtie"
 
+require 'opentelemetry/sdk'
+require 'opentelemetry/exporter/otlp'
+require 'opentelemetry/instrumentation/all'
+
+begin
+  OpenTelemetry::SDK.configure do |c|
+    c.service_name = ENV['SERVICE_NAME'] || "greeter"
+    c.use_all()
+  end
+rescue OpenTelemetry::SDK::ConfigurationError => e
+  puts "Don't like that configuration, friend."
+  puts e.inspect
+end
+
 # Greeter is a minimal Rails application inspired by
 # the Rails bug report template for action controller.
 # The configuration is compatible with Rails 6.0
@@ -22,17 +36,39 @@ class GreeterApp < Rails::Application
   end
 end
 
-class GreetingsController < ActionController::Base
-  # GET /greeting?name=Eustace
-  def index
-    @name = params.fetch(:name, "honored visitor")
-    render inline: "Hello, <%= @name %>.\n"
+class ApplicationController < ActionController::Base
+  private
+  def tracer
+    OpenTelemetry.tracer_provider.tracer('greeter-internal')
   end
 end
 
-class ErrorsController < ActionController::Base
+class GreetingsController < ApplicationController
+  # GET /greeting?name=Eustace
+  def index
+    OpenTelemetry::Trace
+      .current_span
+      .add_event("Emoji are fun! ᕕ( ᐛ )ᕗ")
+
+    @greeting = "Hello"
+    @name = params.fetch(:name, "honored visitor")
+
+    tracer.in_span("🎨 render greeting ✨") do |span|
+      span.add_attributes({
+        "app.greeting" => @greeting
+      })
+      render inline: "<%= @greeting %>, <%= @name %>."
+    end
+  end
+end
+
+class ErrorsController < ApplicationController
   # GET /error -> always 500s as a result of an exception in the view template
   def index
+    OpenTelemetry::Trace
+      .current_span
+      .add_event("⏲ This action will explode shortly.")
+
     render inline: <<~ERROR_PRONE_ERB
       You won't see this sentence render in the response.
       Because I'm gonna <% raise 'an exception inside ActionView!' %>
